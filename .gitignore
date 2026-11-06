@@ -1,0 +1,85 @@
+
+# =========================
+# DATASETS
+# =========================
+
+data/raw/*
+data/synthetic_raw/*
+data/processed/*
+data/batches/*
+
+!data/raw/.gitkeep
+!data/synthetic_raw/.gitkeep
+!data/processed/.gitkeep
+!data/batches/.gitkeep
+
+*.csv
+*.parquet
+*.jsonl
+*.zip
+*.gz
+
+# =========================
+# PYTHON
+# =========================
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+.venv/
+venv/
+env/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# =========================
+# ENVIRONMENT
+# =========================
+
+.env
+.env.*
+!.env.example
+
+# =========================
+# AWS
+# =========================
+
+.aws/
+.aws-sam/
+samconfig.toml
+
+*.pem
+*.key
+*.p12
+*.pfx
+
+# =========================
+# REACT / NODE
+# =========================
+
+node_modules/
+frontend/dist/
+frontend/build/
+coverage/
+
+# =========================
+# LOGS
+# =========================
+
+*.log
+logs/
+
+# =========================
+# IDE / OS
+# =========================
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+.idea/
+.DS_Store
+Thumbs.db
