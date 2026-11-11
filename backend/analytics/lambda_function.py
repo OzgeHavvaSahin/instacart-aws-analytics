@@ -13,6 +13,7 @@ def lambda_handler(event, context):
 
     except Exception:
         logger.exception("Unhandled API error")
+
         return error_response(
             "Internal server error",
             status_code=500
