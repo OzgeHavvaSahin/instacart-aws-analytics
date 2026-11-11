@@ -1,0 +1,30 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: "eu-north-1"
+    ECR_REPOSITORY: "instacart-analytics-api"
+
+phases:
+  pre_build:
+    commands:
+      - echo "Checking AWS identity..."
+      - aws sts get-caller-identity
+
+      - echo "Logging into Amazon ECR..."
+      - aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin 599415174952.dkr.ecr.eu-north-1.amazonaws.com
+
+  build:
+    commands:
+      - echo "Building Docker image..."
+      - docker build --platform linux/amd64 -t instacart-analytics-api:latest -f backend/analytics/Dockerfile backend/analytics
+
+      - echo "Tagging Docker image..."
+      - docker tag instacart-analytics-api:latest 599415174952.dkr.ecr.eu-north-1.amazonaws.com/instacart-analytics-api:latest
+
+  post_build:
+    commands:
+      - echo "Pushing image to ECR..."
+      - docker push 599415174952.dkr.ecr.eu-north-1.amazonaws.com/instacart-analytics-api:latest
+
+      - echo "Image uploaded successfully!"
