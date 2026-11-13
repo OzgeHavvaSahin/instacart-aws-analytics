@@ -15,17 +15,16 @@ def build_aisles_filter_query(department_id=None):
         )
 
     return f"""
-    SELECT DISTINCT
+    SELECT
         a.aisle_id,
         a.aisle,
-        p.department_id
+        MIN(p.department_id) AS department_id
     FROM instacart_db.aisles a
     JOIN instacart_db.products p
         ON a.aisle_id = p.aisle_id
     {where_clause}
-    ORDER BY
-        a.aisle,
-        p.department_id
+    GROUP BY a.aisle_id, a.aisle
+    ORDER BY a.aisle
     """
 
 
