@@ -1,3 +1,4 @@
+
 import {
   useCallback,
   useEffect,
@@ -16,9 +17,13 @@ import type {
   OverviewFilters,
 } from "./types/analytics";
 
+import OrdersTrendChart from "./components/OrdersTrendChart";
+
 import "./App.css";
 
-import OrdersTrendChart from "./components/OrdersTrendChart";
+// =====================================
+// TYPES
+// =====================================
 
 type FormFilters = {
   department_id: string;
@@ -30,8 +35,13 @@ type FormFilters = {
 
 type Metric = {
   key: string;
+  label: string;
   value: number;
 };
+
+// =====================================
+// CONSTANTS
+// =====================================
 
 const emptyFilters: FormFilters = {
   department_id: "",
@@ -41,9 +51,16 @@ const emptyFilters: FormFilters = {
   reordered: "",
 };
 
-const numberFormat = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 2,
+const integerFormatter = new Intl.NumberFormat("en-US");
+
+const currencyFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
 });
+
+// =====================================
+// HELPERS
+// =====================================
 
 function toApiFilters(
   form: FormFilters
@@ -52,135 +69,96 @@ function toApiFilters(
     ...(form.department_id && {
       department_id: Number(form.department_id),
     }),
+
     ...(form.aisle_id && {
       aisle_id: Number(form.aisle_id),
     }),
+
     ...(form.date_from && {
       date_from: form.date_from,
     }),
+
     ...(form.date_to && {
       date_to: form.date_to,
     }),
+
     ...(form.reordered !== "" && {
       reordered: form.reordered === "true",
     }),
   };
 }
 
-// API'den gelen gerçek sayısal alanları bul.
-function collectMetrics(
-  value: unknown,
-  prefix = "",
-  depth = 0
+function formatMetric(metric: Metric): string {
+  switch (metric.key) {
+    case "estimated_revenue":
+      return currencyFormatter.format(metric.value);
+
+    case "reorder_rate":
+      return `${metric.value.toFixed(2)}%`;
+
+    case "avg_basket_size":
+      return metric.value.toFixed(2);
+
+    default:
+      return integerFormatter.format(metric.value);
+  }
+}
+
+function createMetrics(
+  overview: OverviewData | null
 ): Metric[] {
-  if (
-    !value ||
-    typeof value !== "object" ||
-    Array.isArray(value) ||
-    depth > 3
-  ) {
+  if (!overview) {
     return [];
   }
 
-  const result: Metric[] = [];
-
-  for (const [key, entry] of Object.entries(value)) {
-    const path = prefix
-      ? `${prefix}.${key}`
-      : key;
-
-    if (
-      typeof entry === "number" &&
-      Number.isFinite(entry)
-    ) {
-      result.push({
-        key: path,
-        value: entry,
-      });
-    } else if (
-      entry &&
-      typeof entry === "object" &&
-      !Array.isArray(entry)
-    ) {
-      result.push(
-        ...collectMetrics(entry, path, depth + 1)
-      );
-    }
-  }
-
-  return result;
+  return [
+    {
+      key: "total_orders",
+      label: "Total Orders",
+      value: overview.total_orders,
+    },
+    {
+      key: "total_customers",
+      label: "Total Customers",
+      value: overview.total_customers,
+    },
+    {
+      key: "total_items",
+      label: "Total Items",
+      value: overview.total_items,
+    },
+    {
+      key: "estimated_revenue",
+      label: "Revenue",
+      value: overview.estimated_revenue,
+    },
+    {
+      key: "avg_basket_size",
+      label: "Avg. Basket Size",
+      value: overview.avg_basket_size,
+    },
+    {
+      key: "reorder_rate",
+      label: "Reorder Rate",
+      value: overview.reorder_rate,
+    },
+  ];
 }
 
-function labelOf(key: string) {
-  return key
-    .split(".")
-    .pop()!
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-
-function formatMetric(metric: Metric) {
-  if (metric.key === "estimated_revenue") {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(metric.value);
-  }
-
-  if (metric.key === "reorder_rate") {
-    return `${metric.value.toFixed(2)}%`;
-  }
-
-  if (metric.key === "avg_basket_size") {
-    return metric.value.toFixed(2);
-  }
-
-  return new Intl.NumberFormat("en-US").format(
-    metric.value
-  );
-}
-
-
-const priority = [
-  "total_revenue",
-  "revenue",
-  "total_orders",
-  "order_count",
-  "total_customers",
-  "unique_customers",
-  "total_users",
-  "total_items",
-  "avg_order_value",
-  "average_order_value",
-  "reorder_rate",
-];
-
-function prioritizeMetrics(metrics: Metric[]) {
-  return [...metrics].sort((a, b) => {
-    const score = (key: string) => {
-      const leaf = key
-        .split(".")
-        .pop()!
-        .toLowerCase();
-
-      const index = priority.indexOf(leaf);
-
-      return index < 0
-        ? priority.length
-        : index;
-    };
-
-    return score(a.key) - score(b.key);
-  });
-}
+// =====================================
+// MAIN APPLICATION
+// =====================================
 
 export default function App() {
+  // -----------------------------------
+  // STATE
+  // -----------------------------------
+
   const [filtersData, setFiltersData] =
     useState<FiltersData | null>(null);
 
   const [form, setForm] =
-    useState<FormFilters>(emptyFilters);
+    useState<FormFilters>({ ...emptyFilters });
 
   const [overview, setOverview] =
     useState<OverviewData | null>(null);
@@ -200,10 +178,12 @@ export default function App() {
   const [lastUpdated, setLastUpdated] =
     useState<string | null>(null);
 
-  const filterRequestId = useRef(0);
   const overviewRequestId = useRef(0);
 
-  // Overview verilerini getir.
+  // -----------------------------------
+  // OVERVIEW API
+  // -----------------------------------
+
   const loadOverview = useCallback(
     async (params: OverviewFilters) => {
       const requestId =
@@ -213,8 +193,7 @@ export default function App() {
       setError(null);
 
       try {
-        const response =
-          await fetchOverview(params);
+        const response = await fetchOverview(params);
 
         if (
           requestId !== overviewRequestId.current
@@ -236,14 +215,16 @@ export default function App() {
         );
       } catch (err) {
         if (
-          requestId === overviewRequestId.current
+          requestId !== overviewRequestId.current
         ) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Overview error"
-          );
+          return;
         }
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Overview data could not be loaded"
+        );
       } finally {
         if (
           requestId === overviewRequestId.current
@@ -255,85 +236,81 @@ export default function App() {
     []
   );
 
-  // Sayfa ilk açıldığında yükle.
+  // -----------------------------------
+  // INITIAL DATA LOADING
+  // -----------------------------------
+
   useEffect(() => {
     let mounted = true;
 
-    fetchFilters()
-      .then((result) => {
-        if (mounted) {
-          setFiltersData(result.data);
+    async function loadInitialFilters() {
+      setFiltersLoading(true);
+
+      try {
+        // Fetch all department-aisle relationships once.
+        const response = await fetchFilters();
+
+        if (!mounted) {
+          return;
         }
-      })
-      .catch((err: unknown) => {
-        if (mounted) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Filter error"
+
+        if (!response.success) {
+          throw new Error(
+            "Filters API returned an error"
           );
         }
-      })
-      .finally(() => {
+
+        setFiltersData(response.data);
+      } catch (err) {
+        if (!mounted) {
+          return;
+        }
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Filter options could not be loaded"
+        );
+      } finally {
         if (mounted) {
           setFiltersLoading(false);
         }
-      });
+      }
+    }
 
+    void loadInitialFilters();
     void loadOverview({});
 
     return () => {
       mounted = false;
       overviewRequestId.current++;
-      filterRequestId.current++;
     };
   }, [loadOverview]);
 
-  // Department değişince aisle listesini güncelle.
-  async function handleDepartmentChange(
-    value: string
-  ) {
+  // -----------------------------------
+  // DEPARTMENT / AISLE FILTERING
+  // -----------------------------------
+
+  function handleDepartmentChange(value: string) {
     setForm((previous) => ({
       ...previous,
       department_id: value,
       aisle_id: "",
     }));
-
-    setError(null);
-
-    const requestId =
-      ++filterRequestId.current;
-
-    setFiltersLoading(true);
-
-    try {
-      const result = await fetchFilters(
-        value ? Number(value) : undefined
-      );
-
-      if (
-        requestId === filterRequestId.current
-      ) {
-        setFiltersData(result.data);
-      }
-    } catch (err) {
-      if (
-        requestId === filterRequestId.current
-      ) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Filter error"
-        );
-      }
-    } finally {
-      if (
-        requestId === filterRequestId.current
-      ) {
-        setFiltersLoading(false);
-      }
-    }
   }
+
+  const visibleAisles = (
+    filtersData?.aisles ?? []
+  ).filter(
+    (aisle) =>
+      form.department_id === "" ||
+      aisle.department_id ===
+        Number(form.department_id)
+  );
+
+  // -----------------------------------
+  // APPLY FILTERS
+  // -----------------------------------
 
   function applyFilters() {
     if (
@@ -344,56 +321,49 @@ export default function App() {
       setError(
         "Başlangıç tarihi bitiş tarihinden büyük olamaz."
       );
+
       return;
     }
 
-    void loadOverview(toApiFilters(form));
+    const params = toApiFilters(form);
+
+    void loadOverview(params);
   }
+
+  // -----------------------------------
+  // RESET FILTERS
+  // -----------------------------------
 
   function resetFilters() {
     setForm({ ...emptyFilters });
     setError(null);
 
-    void handleDepartmentChange("");
     void loadOverview({});
   }
 
+  // -----------------------------------
+  // DERIVED DATA
+  // -----------------------------------
 
-const metrics: Metric[] = overview
-  ? [
-      {
-        key: "total_orders",
-        value: overview.total_orders,
-      },
-      {
-        key: "total_customers",
-        value: overview.total_customers,
-      },
-      {
-        key: "total_items",
-        value: overview.total_items,
-      },
-      {
-        key: "estimated_revenue",
-        value: overview.estimated_revenue,
-      },
-      {
-        key: "avg_basket_size",
-        value: overview.avg_basket_size,
-      },
-      {
-        key: "reorder_rate",
-        value: overview.reorder_rate,
-      },
-    ]
-  : [];
+  const metrics = createMetrics(overview);
 
+  const activeCount = Object.values(
+    appliedParams
+  ).filter(
+    (value) =>
+      value !== undefined &&
+      value !== null &&
+      value !== ""
+  ).length;
 
-  const activeCount =
-    Object.keys(appliedParams).length;
+  // -----------------------------------
+  // RENDER
+  // -----------------------------------
 
   return (
     <div className="app-shell">
+      {/* SIDEBAR */}
+
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-icon">◈</span>
@@ -418,14 +388,20 @@ const metrics: Metric[] = overview
 
         <div className="sidebar-foot">
           Data source
+
           <strong>Amazon Athena</strong>
+
           <small>
             Orders · Products · Customers
           </small>
         </div>
       </aside>
 
+      {/* MAIN CONTENT */}
+
       <main className="main-content">
+        {/* HEADER */}
+
         <header className="header">
           <div>
             <p className="eyebrow">
@@ -445,14 +421,15 @@ const metrics: Metric[] = overview
           </span>
         </header>
 
+        {/* GLOBAL FILTERS */}
+
         <section className="panel filter-panel">
           <div className="panel-heading">
             <div>
-              <h2>Global filters</h2>
+              <h2>Global Filters</h2>
 
               <p>
-                Apply filters to refresh the
-                full overview.
+                Apply filters to refresh analytics.
               </p>
             </div>
 
@@ -462,14 +439,17 @@ const metrics: Metric[] = overview
           </div>
 
           <div className="filter-grid">
+            {/* DEPARTMENT */}
+
             <label>
               Department
 
               <select
                 value={form.department_id}
-                onChange={(e) =>
-                  void handleDepartmentChange(
-                    e.target.value
+                disabled={filtersLoading}
+                onChange={(event) =>
+                  handleDepartmentChange(
+                    event.target.value
                   )
                 }
               >
@@ -490,16 +470,18 @@ const metrics: Metric[] = overview
               </select>
             </label>
 
+            {/* AISLE */}
+
             <label>
               Aisle
 
               <select
                 value={form.aisle_id}
                 disabled={filtersLoading}
-                onChange={(e) =>
+                onChange={(event) =>
                   setForm((previous) => ({
                     ...previous,
-                    aisle_id: e.target.value,
+                    aisle_id: event.target.value,
                   }))
                 }
               >
@@ -507,24 +489,21 @@ const metrics: Metric[] = overview
                   All Aisles
                 </option>
 
-                {filtersData?.aisles.map(
-                  (aisle) => (
-                    <option
-                      key={aisle.id}
-                      value={aisle.id}
-                    >
-                      {aisle.name}
-                    </option>
-                  )
-                )}
+                {visibleAisles.map((aisle) => (
+                  <option
+                    key={aisle.id}
+                    value={aisle.id}
+                  >
+                    {aisle.name}
+                  </option>
+                ))}
               </select>
             </label>
 
+            {/* DATE FROM */}
+
             <label>
-              From date
-              <span className="helper">
-                {" "}(synthetic)
-              </span>
+              From Date
 
               <input
                 type="date"
@@ -537,20 +516,19 @@ const metrics: Metric[] = overview
                   filtersData?.date_range.max ??
                   undefined
                 }
-                onChange={(e) =>
+                onChange={(event) =>
                   setForm((previous) => ({
                     ...previous,
-                    date_from: e.target.value,
+                    date_from: event.target.value,
                   }))
                 }
               />
             </label>
 
+            {/* DATE TO */}
+
             <label>
-              To date
-              <span className="helper">
-                {" "}(synthetic)
-              </span>
+              To Date
 
               <input
                 type="date"
@@ -563,29 +541,31 @@ const metrics: Metric[] = overview
                   filtersData?.date_range.max ??
                   undefined
                 }
-                onChange={(e) =>
+                onChange={(event) =>
                   setForm((previous) => ({
                     ...previous,
-                    date_to: e.target.value,
+                    date_to: event.target.value,
                   }))
                 }
               />
             </label>
 
+            {/* PURCHASE TYPE */}
+
             <label>
-              Purchase type
+              Purchase Type
 
               <select
                 value={form.reordered}
-                onChange={(e) =>
+                onChange={(event) =>
                   setForm((previous) => ({
                     ...previous,
-                    reordered: e.target.value,
+                    reordered: event.target.value,
                   }))
                 }
               >
                 <option value="">
-                  All purchases
+                  All Purchases
                 </option>
 
                 <option value="true">
@@ -593,18 +573,20 @@ const metrics: Metric[] = overview
                 </option>
 
                 <option value="false">
-                  First-time purchase
+                  First-time Purchase
                 </option>
               </select>
             </label>
           </div>
 
+          {/* FILTER ACTIONS */}
+
           <div className="filter-actions">
             <span className="loading-caption">
               {filtersLoading
-                ? "Loading filter options…"
+                ? "Loading filter options..."
                 : loading
-                ? "Querying Athena…"
+                ? "Querying Athena..."
                 : lastUpdated
                 ? `Updated at ${lastUpdated}`
                 : "Ready"}
@@ -614,7 +596,7 @@ const metrics: Metric[] = overview
               type="button"
               className="btn btn-secondary"
               onClick={resetFilters}
-              disabled={loading}
+              disabled={loading || filtersLoading}
             >
               Reset
             </button>
@@ -623,16 +605,16 @@ const metrics: Metric[] = overview
               type="button"
               className="btn btn-primary"
               onClick={applyFilters}
-              disabled={
-                loading || filtersLoading
-              }
+              disabled={loading || filtersLoading}
             >
               {loading
-                ? "Loading…"
-                : "Apply filters"}
+                ? "Loading..."
+                : "Apply Filters"}
             </button>
           </div>
         </section>
+
+        {/* ERROR */}
 
         {error && (
           <div
@@ -643,63 +625,65 @@ const metrics: Metric[] = overview
           </div>
         )}
 
+        {/* KPI SECTION */}
+
         <section className="dashboard-section">
           <div className="section-title">
             <div>
               <h2>
-                Key performance indicators
+                Key Performance Indicators
               </h2>
 
               <p>
-                Metrics returned by the overview
-                API. Synthetic prices and dates
-                where applicable.
+                Overview of order, customer,
+                revenue and purchase metrics.
               </p>
             </div>
           </div>
 
           <div className="kpi-grid">
-            {metrics.length ? (
-              metrics
-                .slice(0, 8)
-                .map((metric) => (
-                  <article
-                    key={metric.key}
-                    className="kpi-card"
-                  >
-                    <div className="kpi-label">
-                      {labelOf(metric.key)}
-                    </div>
+            {metrics.length > 0 ? (
+              metrics.map((metric) => (
+                <article
+                  key={metric.key}
+                  className="kpi-card"
+                >
+                  <div className="kpi-label">
+                    {metric.label}
+                  </div>
 
-                    <strong className="kpi-value">
-                      {formatMetric(metric)}
-                    </strong>
+                  <strong className="kpi-value">
+                    {formatMetric(metric)}
+                  </strong>
 
-                    <small title={metric.key}>
-                      {metric.key}
-                    </small>
-                  </article>
-                ))
+                  <small title={metric.key}>
+                    {metric.key}
+                  </small>
+                </article>
+              ))
             ) : (
               <div className="empty-card">
                 {loading
-                  ? "Loading overview KPIs…"
-                  : "No numeric KPIs returned. Inspect the API response below."}
+                  ? "Loading overview KPIs..."
+                  : "No overview data available."}
               </div>
             )}
           </div>
         </section>
 
+        {/* ORDERS TREND */}
+
         <OrdersTrendChart />
+
+        {/* METRIC DETAILS */}
 
         <section className="panel detail-panel">
           <div className="panel-heading">
             <div>
-              <h2>Metric details</h2>
+              <h2>Metric Details</h2>
 
               <p>
-                All numeric overview metrics.
-                No placeholder data.
+                Detailed overview metrics.
               </p>
             </div>
 
@@ -708,13 +692,13 @@ const metrics: Metric[] = overview
             </span>
           </div>
 
-          {metrics.length ? (
+          {metrics.length > 0 ? (
             <div className="table-scroll">
               <table>
                 <thead>
                   <tr>
                     <th>Metric</th>
-                    <th>API field</th>
+                    <th>API Field</th>
                     <th>Value</th>
                   </tr>
                 </thead>
@@ -722,9 +706,7 @@ const metrics: Metric[] = overview
                 <tbody>
                   {metrics.map((metric) => (
                     <tr key={metric.key}>
-                      <td>
-                        {labelOf(metric.key)}
-                      </td>
+                      <td>{metric.label}</td>
 
                       <td className="api-field">
                         {metric.key}
@@ -745,13 +727,15 @@ const metrics: Metric[] = overview
           )}
         </section>
 
+        {/* DEVELOPER DIAGNOSTICS */}
+
         <details className="debug-details">
           <summary>
-            Developer diagnostics: API
-            response and applied parameters
+            Developer diagnostics:
+            API response and applied parameters
           </summary>
 
-          <h3>Applied parameters</h3>
+          <h3>Applied Parameters</h3>
 
           <pre>
             {JSON.stringify(
@@ -761,7 +745,7 @@ const metrics: Metric[] = overview
             )}
           </pre>
 
-          <h3>Overview response</h3>
+          <h3>Overview Response</h3>
 
           <pre>
             {JSON.stringify(
@@ -772,10 +756,11 @@ const metrics: Metric[] = overview
           </pre>
         </details>
 
+        {/* FOOTER */}
+
         <footer>
           Instacart Market Basket Analysis
-          · Synthetic pricing/date enrichment
-          · AWS Athena
+          · AWS Athena Analytics
         </footer>
       </main>
     </div>

@@ -18,23 +18,6 @@ export interface SummaryData {
   revenue_type: "synthetic";
 }
 
-
-export interface FilterOption {
-  id: number;
-  name: string;
-}
-
-export interface FiltersData {
-  departments: FilterOption[];
-  aisles: FilterOption[];
-  date_range: {
-    min: string | null;
-    max: string | null;
-  };
-  selected_department_id: number | null;
-  date_type: "synthetic";
-}
-
 export interface OverviewFilters {
   date_from?: string;
   date_to?: string;
@@ -60,4 +43,24 @@ export interface OverviewData {
     aisle_id: number | null;
     reordered: boolean | null;
   };
+}
+
+export interface FilterOption {
+  id: number;
+  name: string;
+}
+
+export interface AisleOption extends FilterOption {
+  department_id: number;
+}
+
+export interface FiltersData {
+  departments: FilterOption[];
+  aisles: AisleOption[];
+  date_range: {
+    min: string | null;
+    max: string | null;
+  };
+  selected_department_id: number | null;
+  date_type: "synthetic";
 }
