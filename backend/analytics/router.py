@@ -20,6 +20,20 @@ from utils.validators import validate_products_filters
 logger = logging.getLogger(__name__)
 
 
+from queries.filters import (
+    DEPARTMENTS_FILTER_QUERY,
+    DATE_BOUNDS_QUERY,
+    build_aisles_filter_query,
+)
+
+from queries.overview import build_overview_query
+
+from utils.validators import (
+    parse_positive_int,
+    validate_overview_filters,
+)
+
+
 # ======================================
 # SUMMARY
 # ======================================
@@ -139,6 +153,97 @@ def get_orders_trend():
         "date_type": "synthetic"
     })
 
+def get_filters(params):
+    department_id = parse_positive_int(
+        params.get("department_id"),
+        "department_id"
+    )
+
+    departments_result = run_query(
+        DEPARTMENTS_FILTER_QUERY,
+        max_rows=100
+    )
+
+    aisles_result = run_query(
+        build_aisles_filter_query(department_id),
+        max_rows=200
+    )
+
+    dates_result = run_query(
+        DATE_BOUNDS_QUERY,
+        max_rows=1
+    )
+
+    departments = [
+        {
+            "id": int(row["department_id"]),
+            "name": row["department"]
+        }
+        for row in departments_result["rows"]
+    ]
+
+    aisles = [
+        {
+            "id": int(row["aisle_id"]),
+            "name": row["aisle"]
+        }
+        for row in aisles_result["rows"]
+    ]
+
+    date_row = (
+        dates_result["rows"][0]
+        if dates_result["rows"]
+        else {}
+    )
+
+    return success_response({
+        "departments": departments,
+        "aisles": aisles,
+        "date_range": {
+            "min": date_row.get("min_date") or None,
+            "max": date_row.get("max_date") or None
+        },
+        "selected_department_id": department_id,
+        "date_type": "synthetic"
+    })
+
+
+def get_overview(params):
+    filters = validate_overview_filters(params)
+
+    result = run_query(
+        build_overview_query(filters),
+        max_rows=1
+    )
+
+    if not result["rows"]:
+        raise RuntimeError(
+            "Overview query returned no data"
+        )
+
+    row = result["rows"][0]
+
+    return success_response({
+        "total_orders": int(row["total_orders"] or 0),
+        "total_customers": int(
+            row["total_customers"] or 0
+        ),
+        "total_items": int(row["total_items"] or 0),
+        "estimated_revenue": float(
+            row["estimated_revenue"] or 0
+        ),
+        "avg_basket_size": float(
+            row["avg_basket_size"] or 0
+        ),
+        "reorder_rate": float(
+            row["reorder_rate"] or 0
+        ),
+        "currency": "USD",
+        "revenue_type": "synthetic",
+        "date_type": "synthetic",
+        "applied_filters": filters
+    })
+
 
 # ======================================
 # ROUTER
@@ -195,6 +300,26 @@ def route_request(event):
                 str(error),
                 status_code=400
             )
+
+    
+    if path == "/api/filters":
+        try:
+            return get_filters(params)
+        except ValueError as error:
+            return error_response(
+                str(error),
+                status_code=400
+            )
+
+    if path == "/api/analytics/overview":
+        try:
+            return get_overview(params)
+        except ValueError as error:
+            return error_response(
+                str(error),
+                status_code=400
+            )
+
 
     return error_response(
         "Endpoint not found",

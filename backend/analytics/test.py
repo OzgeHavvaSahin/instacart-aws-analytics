@@ -37,22 +37,27 @@ def test_endpoint(path, params=None):
 
 if __name__ == "__main__":
    
+   
+    test_endpoint("/api/filters")
+
     test_endpoint(
-        "/api/analytics/products",
+        "/api/filters",
+        {"department_id": "4"}
+    )
+
+    test_endpoint("/api/analytics/overview")
+
+    test_endpoint(
+        "/api/analytics/overview",
         {
             "department_id": "4",
-            "limit": "5",
-            "sort_by": "units_sold",
-            "sort_order": "desc",
-        },
+        }
     )
 
     test_endpoint(
-        "/api/analytics/products",
+        "/api/analytics/overview",
         {
-            "limit": "10",
-            "sort_by": "reorder_rate",
-            "sort_order": "desc",
-        },
+            "department_id": "4",
+            "reordered": "true",
+        }
     )
-
