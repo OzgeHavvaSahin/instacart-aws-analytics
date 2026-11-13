@@ -166,7 +166,7 @@ def get_filters(params):
 
     aisles_result = run_query(
         build_aisles_filter_query(department_id),
-        max_rows=200
+        max_rows=3000
     )
 
     dates_result = run_query(
@@ -185,7 +185,8 @@ def get_filters(params):
     aisles = [
         {
             "id": int(row["aisle_id"]),
-            "name": row["aisle"]
+            "name": row["aisle"],
+            "department_id": int(row["department_id"])
         }
         for row in aisles_result["rows"]
     ]
