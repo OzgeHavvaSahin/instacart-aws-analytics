@@ -20,3 +20,73 @@ def get_top_products_query(limit=10):
     ORDER BY units_sold DESC
     LIMIT {limit}
     """
+
+
+
+PRODUCT_SORT_COLUMNS = {
+    "units_sold": "units_sold",
+    "estimated_revenue": "estimated_revenue",
+    "reorder_rate": "reorder_rate",
+    "product_name": "product_name",
+}
+
+
+def build_products_query(filters):
+    conditions = []
+
+    if filters["department_id"] is not None:
+        conditions.append(
+            f"p.department_id = {filters['department_id']}"
+        )
+
+    if filters["aisle_id"] is not None:
+        conditions.append(
+            f"p.aisle_id = {filters['aisle_id']}"
+        )
+
+    if filters["reordered"] is not None:
+        value = 1 if filters["reordered"] else 0
+        conditions.append(f"oi.reordered = {value}")
+
+    where_clause = (
+        "WHERE " + " AND ".join(conditions)
+        if conditions else ""
+    )
+
+    sort_column = PRODUCT_SORT_COLUMNS[
+        filters["sort_by"]
+    ]
+    sort_order = filters["sort_order"].upper()
+    limit = filters["limit"]
+
+    return f"""
+    SELECT
+        p.product_id,
+        p.product_name,
+        p.department_id,
+        p.aisle_id,
+        COUNT(*) AS units_sold,
+        COUNT(DISTINCT oi.order_id) AS order_count,
+        ROUND(SUM(p.unit_price), 2)
+            AS estimated_revenue,
+        ROUND(
+            100.0 *
+            SUM(CASE WHEN oi.reordered = 1
+                     THEN 1 ELSE 0 END)
+            / NULLIF(COUNT(*), 0),
+            2
+        ) AS reorder_rate
+    FROM instacart_db.order_items oi
+    JOIN instacart_db.products p
+        ON oi.product_id = p.product_id
+    {where_clause}
+    GROUP BY
+        p.product_id,
+        p.product_name,
+        p.department_id,
+        p.aisle_id
+    ORDER BY
+        {sort_column} {sort_order},
+        p.product_id ASC
+    LIMIT {limit}
+    """

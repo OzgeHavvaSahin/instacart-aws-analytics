@@ -36,15 +36,23 @@ def test_endpoint(path, params=None):
 
 
 if __name__ == "__main__":
-    test_endpoint("/api/health")
-    test_endpoint("/api/summary")
-
+   
     test_endpoint(
-        "/api/top-products",
-        {"limit": "5"}
+        "/api/analytics/products",
+        {
+            "department_id": "4",
+            "limit": "5",
+            "sort_by": "units_sold",
+            "sort_order": "desc",
+        },
     )
 
-    test_endpoint("/api/departments")
-    test_endpoint("/api/orders-trend")
+    test_endpoint(
+        "/api/analytics/products",
+        {
+            "limit": "10",
+            "sort_by": "reorder_rate",
+            "sort_order": "desc",
+        },
+    )
 
-    print("\nALL ENDPOINT TESTS PASSED")

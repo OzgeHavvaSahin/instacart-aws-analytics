@@ -14,6 +14,8 @@ from utils.responses import (
 
 from utils.validators import validate_limit
 
+from queries.products import build_products_query
+from utils.validators import validate_products_filters
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +187,55 @@ def route_request(event):
     if path == "/api/orders-trend":
         return get_orders_trend()
 
+    if path == "/api/analytics/products":
+        try:
+            return get_filtered_products(params)
+        except ValueError as error:
+            return error_response(
+                str(error),
+                status_code=400
+            )
+
     return error_response(
         "Endpoint not found",
         status_code=404
     )
+
+
+def get_filtered_products(params):
+    filters = validate_products_filters(params)
+
+    sql = build_products_query(filters)
+
+    result = run_query(
+        sql,
+        max_rows=filters["limit"]
+    )
+
+    products = []
+
+    for row in result["rows"]:
+        products.append({
+            "product_id": int(row["product_id"]),
+            "product_name": row["product_name"],
+            "department_id": int(row["department_id"]),
+            "aisle_id": int(row["aisle_id"]),
+            "units_sold": int(row["units_sold"]),
+            "order_count": int(row["order_count"]),
+            "estimated_revenue": float(
+                row["estimated_revenue"]
+            ),
+            "reorder_rate": float(
+                row["reorder_rate"]
+            ),
+        })
+
+    return success_response({
+        "items": products,
+        "count": len(products),
+        "filters": filters,
+        "metadata": {
+            "revenue_type": "synthetic",
+            "reorder_rate_unit": "percent",
+        },
+    })
