@@ -210,13 +210,14 @@ export default function OrdersTrendChart() {
                 width={55}
               />
 
-              <Tooltip
-                formatter={(value) => [
-                  Number(value).toLocaleString("en-US"),
-                  "Orders",
+                            
+                <Tooltip
+                formatter={(value, name) => [
+                    Number(value).toLocaleString("en-US"),
+                    name,
                 ]}
-              />
-                <Legend verticalAlign="top" height={36} />
+                />
+
               <Line
                 type="monotone"
                 dataKey="orders"
@@ -225,17 +226,7 @@ export default function OrdersTrendChart() {
                 dot={false}
                 activeDot={{ r: 5 }}
               />
-
-              <Line
-                type="monotone"
-                dataKey="customers"
-                name="Customers"
-                stroke="#6366f1"
-                strokeWidth={2.5}
-                dot={false}
-                activeDot={{ r: 5 }}
-            />
-              
+                                
             </LineChart>
           </ResponsiveContainer>
         </div>
