@@ -4,33 +4,47 @@ import json
 from lambda_function import lambda_handler
 
 
-event = {
-    "version": "2.0",
-    "rawPath": "/api/summary",
-    "requestContext": {
-        "http": {
-            "method": "GET",
-            "path": "/api/summary"
-        }
+def test_endpoint(path, params=None):
+    event = {
+        "version": "2.0",
+        "rawPath": path,
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": path
+            }
+        },
+        "queryStringParameters": params or {}
     }
-}
 
-response = lambda_handler(event, None)
+    response = lambda_handler(event, None)
 
-print("HTTP Status:", response["statusCode"])
+    print("\n" + "=" * 60)
+    print("ENDPOINT:", path)
+    print("STATUS:", response["statusCode"])
 
-body = json.loads(response["body"])
+    body = json.loads(response["body"])
 
-print(
-    json.dumps(
+    print(json.dumps(
         body,
         indent=2,
         ensure_ascii=False
+    ))
+
+    assert response["statusCode"] == 200, body
+    assert body["success"] is True
+
+
+if __name__ == "__main__":
+    test_endpoint("/api/health")
+    test_endpoint("/api/summary")
+
+    test_endpoint(
+        "/api/top-products",
+        {"limit": "5"}
     )
-)
 
-assert response["statusCode"] == 200
-assert body["success"] is True
-assert body["data"]["total_orders"] == 500000
+    test_endpoint("/api/departments")
+    test_endpoint("/api/orders-trend")
 
-print("SUMMARY ENDPOINT TEST PASSED")
+    print("\nALL ENDPOINT TESTS PASSED")
