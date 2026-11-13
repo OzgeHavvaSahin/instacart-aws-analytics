@@ -31,22 +31,35 @@ PRODUCT_SORT_COLUMNS = {
 }
 
 
+
 def build_products_query(filters):
     conditions = []
 
     if filters["department_id"] is not None:
         conditions.append(
-            f"p.department_id = {filters['department_id']}"
+            f"p.department_id = {int(filters['department_id'])}"
         )
 
     if filters["aisle_id"] is not None:
         conditions.append(
-            f"p.aisle_id = {filters['aisle_id']}"
+            f"p.aisle_id = {int(filters['aisle_id'])}"
         )
 
     if filters["reordered"] is not None:
-        value = 1 if filters["reordered"] else 0
-        conditions.append(f"oi.reordered = {value}")
+        reordered = 1 if filters["reordered"] else 0
+        conditions.append(f"oi.reordered = {reordered}")
+
+    if filters.get("date_from"):
+        conditions.append(
+            "CAST(o.synthetic_order_timestamp AS DATE) >= "
+            f"DATE '{filters['date_from']}'"
+        )
+
+    if filters.get("date_to"):
+        conditions.append(
+            "CAST(o.synthetic_order_timestamp AS DATE) <= "
+            f"DATE '{filters['date_to']}'"
+        )
 
     where_clause = (
         "WHERE " + " AND ".join(conditions)
@@ -56,6 +69,7 @@ def build_products_query(filters):
     sort_column = PRODUCT_SORT_COLUMNS[
         filters["sort_by"]
     ]
+
     sort_order = filters["sort_order"].upper()
     limit = filters["limit"]
 
@@ -67,26 +81,37 @@ def build_products_query(filters):
         p.aisle_id,
         COUNT(*) AS units_sold,
         COUNT(DISTINCT oi.order_id) AS order_count,
-        ROUND(SUM(p.unit_price), 2)
-            AS estimated_revenue,
+        ROUND(
+            COALESCE(SUM(p.unit_price), 0), 2
+        ) AS estimated_revenue,
         ROUND(
             100.0 *
-            SUM(CASE WHEN oi.reordered = 1
-                     THEN 1 ELSE 0 END)
-            / NULLIF(COUNT(*), 0),
+            SUM(
+                CASE WHEN oi.reordered = 1
+                THEN 1 ELSE 0 END
+            ) / NULLIF(COUNT(*), 0),
             2
         ) AS reorder_rate
+
     FROM instacart_db.order_items oi
+
     JOIN instacart_db.products p
         ON oi.product_id = p.product_id
+
+    JOIN instacart_db.orders o
+        ON oi.order_id = o.order_id
+
     {where_clause}
+
     GROUP BY
         p.product_id,
         p.product_name,
         p.department_id,
         p.aisle_id
+
     ORDER BY
         {sort_column} {sort_order},
         p.product_id ASC
+
     LIMIT {limit}
     """
