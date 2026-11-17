@@ -4,16 +4,19 @@ import re
 
 from urllib.parse import unquote_plus
 
-from config import (
-    s3,
-    BUCKET,
-)
+from config import s3, BUCKET
 
 from processor import process_batch
 
 from monitoring import (
     try_save_system_event,
     try_send_error_notification,
+)
+
+from batch_state import (
+    claim_batch,
+    mark_batch_success,
+    mark_batch_failed,
 )
 
 logger = logging.getLogger()
@@ -50,10 +53,49 @@ def lambda_handler(event, context):
             None,
         )
 
-        logger.info(
-            "START BATCH: %s",
-            batch_id,
+        # =====================================
+        # IDEMPOTENCY CHECK
+        # =====================================
+
+        claim_status, attempt_id = claim_batch(
+            batch_id
         )
+
+        if claim_status == "SUCCESS":
+            logger.info(
+                "SKIPPED ALREADY PROCESSED: %s",
+                batch_id,
+            )
+
+            results.append({
+                "batch_id": batch_id,
+                "status": "SKIPPED",
+                "reason": "ALREADY_PROCESSED",
+            })
+            continue
+
+        if claim_status == "PROCESSING":
+            logger.warning(
+                "BATCH ALREADY IN PROGRESS: %s",
+                batch_id,
+            )
+
+            results.append({
+                "batch_id": batch_id,
+                "status": "SKIPPED",
+                "reason": "ALREADY_PROCESSING",
+            })
+            continue
+
+        logger.info(
+            "START BATCH: %s | attempt=%s",
+            batch_id,
+            attempt_id,
+        )
+
+        # =====================================
+        # PROCESS BATCH
+        # =====================================
 
         try:
             response = s3.get_object(
@@ -76,20 +118,6 @@ def lambda_handler(event, context):
                 manifest,
             )
 
-            try_save_system_event(
-                status="SUCCESS",
-                batch_id=batch_id,
-                order_count=manifest["order_count"],
-                item_count=manifest["item_count"],
-                request_id=request_id,
-            )
-
-            results.append({
-                "batch_id": batch_id,
-                "status": "PROCESSED",
-                "files": output,
-            })
-
         except Exception as error:
             logger.exception(
                 "BATCH FAILED: %s",
@@ -103,6 +131,22 @@ def lambda_handler(event, context):
             )
 
             message = str(error)[:500]
+
+            # Mark FAILED before raising.
+            # Failure of this state update is
+            # logged without masking the
+            # original processing exception.
+
+            try:
+                mark_batch_failed(
+                    batch_id,
+                    attempt_id,
+                    message,
+                )
+            except Exception:
+                logger.exception(
+                    "Could not mark batch FAILED"
+                )
 
             try_save_system_event(
                 status="ERROR",
@@ -118,12 +162,43 @@ def lambda_handler(event, context):
                 message=message,
             )
 
-            # Propagate the failure to Lambda.
             raise
+
+        # =====================================
+        # COMMIT BATCH STATE
+        # =====================================
+
+        # This operation must succeed.
+        # If it fails, do NOT falsely report
+        # that the batch is complete.
+
+        mark_batch_success(
+            batch_id=batch_id,
+            attempt_id=attempt_id,
+            order_count=manifest["order_count"],
+            item_count=manifest["item_count"],
+        )
+
+        # Monitoring is secondary to the
+        # authoritative batch-state record.
+
+        try_save_system_event(
+            status="SUCCESS",
+            batch_id=batch_id,
+            order_count=manifest["order_count"],
+            item_count=manifest["item_count"],
+            request_id=request_id,
+        )
+
+        results.append({
+            "batch_id": batch_id,
+            "status": "PROCESSED",
+            "files": output,
+        })
 
     return {
         "statusCode": 200,
         "body": json.dumps({
-            "results": results,
+            "results": results
         }),
     }
