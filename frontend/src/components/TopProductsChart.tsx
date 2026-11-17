@@ -10,12 +10,14 @@ import {
   Tooltip,
 } from "recharts";
 
-import type { OverviewFilters } from "../types/analytics";
-import {
-  makeQuery,
-  type ProductItem,
-  type ProductSort,
-} from "../api/dashboard";
+import type {
+  OverviewFilters,
+  ProductItem,
+  ProductSort,
+} from "../types/analytics";
+
+import { makeQuery } from "../api/analytics";
+
 import { useAnalytics } from "../hooks/useAnalytics";
 
 type Props = {

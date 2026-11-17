@@ -1,6 +1,9 @@
 
 import { useEffect, useState } from "react";
-import { fetchDashboardData } from "../api/dashboard";
+
+import {
+  fetchAnalyticsData,
+} from "../api/analytics";
 
 type CacheEntry = {
   value: unknown;
@@ -21,11 +24,12 @@ async function loadCached<T>(
 ): Promise<T> {
   const cached = cache.get(path);
 
-  if (
-    cached &&
-    cached.expiresAt > Date.now()
-  ) {
-    return cached.value as T;
+  if (cached) {
+    if (cached.expiresAt > Date.now()) {
+      return cached.value as T;
+    }
+
+    cache.delete(path);
   }
 
   const pending = pendingRequests.get(path);
@@ -34,7 +38,7 @@ async function loadCached<T>(
     return pending as Promise<T>;
   }
 
-  const request = fetchDashboardData<T>(path)
+  const request = fetchAnalyticsData<T>(path)
     .then((value) => {
       cache.set(path, {
         value,

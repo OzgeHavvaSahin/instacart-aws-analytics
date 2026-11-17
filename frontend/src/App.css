@@ -527,3 +527,141 @@ footer {
     height: 280px;
   }
 }
+
+
+/* ===================================
+   FULL-WIDTH DASHBOARD LAYOUT
+=================================== */
+
+.app-shell {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  align-items: stretch;
+}
+
+/* Sidebar */
+
+.sidebar {
+  flex: 0 0 250px;
+  width: 250px;
+  min-width: 250px;
+  min-height: 100vh;
+}
+
+/* Main content */
+
+.main-content {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  padding: 32px 36px 48px;
+}
+
+/* Header */
+
+.header {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+/* Global filters */
+
+.filter-panel {
+  width: 100%;
+  max-width: none;
+}
+
+/* KPI grid */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+.kpi-card {
+  min-width: 0;
+}
+
+/* Charts */
+
+.trend-panel,
+.detail-panel,
+.analytics-section {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  width: 100%;
+}
+
+.analytics-grid > * {
+  min-width: 0;
+}
+
+/* ===================================
+   RESPONSIVE
+=================================== */
+
+@media (max-width: 1200px) {
+  .sidebar {
+    flex-basis: 220px;
+    width: 220px;
+    min-width: 220px;
+  }
+
+  .main-content {
+    padding: 28px 24px;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    min-height: auto;
+  }
+
+  .main-content {
+    width: 100%;
+    padding: 20px 16px;
+  }
+
+  .header {
+    flex-direction: column;
+  }
+
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}

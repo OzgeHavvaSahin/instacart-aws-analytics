@@ -80,3 +80,40 @@ export function fetchOverview(filters: OverviewFilters) {
 export function fetchOrdersTrend() {
   return apiGet<unknown>("/api/orders-trend");
 }
+
+
+export function makeQuery(
+  filters: OverviewFilters,
+  extra: Record<string, string | number> = {}
+): string {
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries({
+    ...filters,
+    ...extra,
+  })) {
+    if (
+      value !== undefined &&
+      value !== null &&
+      value !== ""
+    ) {
+      params.set(key, String(value));
+    }
+  }
+
+  return params.toString();
+}
+
+export async function fetchAnalyticsData<T>(
+  path: string
+): Promise<T> {
+  const response = await apiGet<ApiResponse<T>>(path);
+
+  if (!response.success) {
+    throw new Error(
+      "Analytics API returned an error"
+    );
+  }
+
+  return response.data;
+}

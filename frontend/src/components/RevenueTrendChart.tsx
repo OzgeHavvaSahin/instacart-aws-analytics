@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import {
   ResponsiveContainer,
@@ -10,11 +9,13 @@ import {
   Tooltip,
 } from "recharts";
 
-import type { OverviewFilters } from "../types/analytics";
-import {
-  makeQuery,
-  type RevenuePoint,
-} from "../api/dashboard";
+import type {
+  OverviewFilters,
+  RevenuePoint,
+} from "../types/analytics";
+
+import { makeQuery } from "../api/analytics";
+
 import { useAnalytics } from "../hooks/useAnalytics";
 
 type Props = {

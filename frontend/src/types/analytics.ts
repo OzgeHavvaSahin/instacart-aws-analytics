@@ -64,3 +64,52 @@ export interface FiltersData {
   selected_department_id: number | null;
   date_type: "synthetic";
 }
+
+
+
+export type ProductSort =
+  | "units_sold"
+  | "estimated_revenue"
+  | "reorder_rate";
+
+export interface ProductItem {
+  product_id: number;
+  product_name: string;
+  department_id: number;
+  aisle_id: number;
+  units_sold: number;
+  order_count: number;
+  estimated_revenue: number;
+  reorder_rate: number;
+}
+
+export interface RevenuePoint {
+  period: string;
+  total_orders: number;
+  total_items: number;
+  estimated_revenue: number;
+}
+
+export interface DepartmentItem {
+  department_id: number;
+  department_name: string;
+  units_sold: number;
+  total_orders: number;
+  total_customers: number;
+  estimated_revenue: number;
+  reorder_rate: number;
+}
+
+export interface ReorderData {
+  total_items: number;
+  reordered_items: number;
+  first_time_items: number;
+  total_orders: number;
+  reorder_rate: number;
+}
+
+export interface ShoppingPoint {
+  day_of_week: number;
+  hour_of_day: number;
+  total_orders: number;
+}

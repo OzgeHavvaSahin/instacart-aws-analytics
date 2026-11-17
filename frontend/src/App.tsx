@@ -17,9 +17,17 @@ import type {
   OverviewFilters,
 } from "./types/analytics";
 
+// Chart components
 import OrdersTrendChart from "./components/OrdersTrendChart";
+import TopProductsChart from "./components/TopProductsChart";
+import RevenueTrendChart from "./components/RevenueTrendChart";
+import DepartmentPerformanceChart from "./components/DepartmentPerformanceChart";
+import ReorderAnalysisChart from "./components/ReorderAnalysisChart";
+import ShoppingPatternsChart from "./components/ShoppingPatternsChart";
 
+// Styles
 import "./App.css";
+import "./components/AnalyticsCharts.css";
 
 // =====================================
 // TYPES
@@ -51,12 +59,17 @@ const emptyFilters: FormFilters = {
   reordered: "",
 };
 
-const integerFormatter = new Intl.NumberFormat("en-US");
+const integerFormatter = new Intl.NumberFormat(
+  "en-US"
+);
 
-const currencyFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
+const currencyFormatter = new Intl.NumberFormat(
+  "en-US",
+  {
+    style: "currency",
+    currency: "USD",
+  }
+);
 
 // =====================================
 // HELPERS
@@ -129,12 +142,12 @@ function createMetrics(
     },
     {
       key: "estimated_revenue",
-      label: "Revenue",
+      label: "Estimated Revenue",
       value: overview.estimated_revenue,
     },
     {
       key: "avg_basket_size",
-      label: "Avg. Basket Size",
+      label: "Average Basket Size",
       value: overview.avg_basket_size,
     },
     {
@@ -247,7 +260,8 @@ export default function App() {
       setFiltersLoading(true);
 
       try {
-        // Fetch all department-aisle relationships once.
+        // Fetch all department-aisle
+        // relationships once.
         const response = await fetchFilters();
 
         if (!mounted) {
@@ -383,7 +397,7 @@ export default function App() {
         </div>
 
         <div className="nav-item muted">
-          ◷ <span>Analytics modules — next phase</span>
+          ◷ <span>Advanced Analytics</span>
         </div>
 
         <div className="sidebar-foot">
@@ -674,6 +688,45 @@ export default function App() {
         {/* ORDERS TREND */}
 
         <OrdersTrendChart />
+
+        {/* ADVANCED ANALYTICS */}
+
+        <section className="analytics-section">
+          <div className="analytics-section-title">
+            <h2>Advanced Analytics</h2>
+
+            <p>
+              Explore product, revenue and
+              shopping performance.
+            </p>
+          </div>
+
+          <div className="analytics-grid">
+            <RevenueTrendChart
+              filters={appliedParams}
+            />
+
+            <TopProductsChart
+              filters={appliedParams}
+            />
+
+            <DepartmentPerformanceChart
+              filters={appliedParams}
+            />
+
+            <ReorderAnalysisChart
+              filters={appliedParams}
+            />
+          </div>
+        </section>
+
+        {/* SHOPPING PATTERNS */}
+
+        <section className="analytics-section">
+          <ShoppingPatternsChart
+            filters={appliedParams}
+          />
+        </section>
 
         {/* METRIC DETAILS */}
 

@@ -1,9 +1,10 @@
+import type {
+  OverviewFilters,
+  ShoppingPoint,
+} from "../types/analytics";
 
-import type { OverviewFilters } from "../types/analytics";
-import {
-  makeQuery,
-  type ShoppingPoint,
-} from "../api/dashboard";
+import { makeQuery } from "../api/analytics";
+
 import { useAnalytics } from "../hooks/useAnalytics";
 
 type Props = {
