@@ -7,7 +7,7 @@ SELECT
         COALESCE(SUM(p.unit_price), 0),
         2
     ) AS estimated_revenue
-FROM instacart_db.order_items oi
+FROM instacart_db.order_items_safe oi
 JOIN instacart_db.products p
     ON oi.product_id = p.product_id
 JOIN instacart_db.departments d

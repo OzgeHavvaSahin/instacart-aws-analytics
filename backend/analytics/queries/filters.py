@@ -42,5 +42,5 @@ SELECT
             1, 10
         )
     ) AS max_date
-FROM instacart_db.orders
+FROM instacart_db.orders_safe
 """

@@ -5,7 +5,7 @@ SELECT
     ) AS order_date,
     COUNT(*) AS total_orders,
     COUNT(DISTINCT user_id) AS total_customers
-FROM instacart_db.orders
+FROM instacart_db.orders_safe
 GROUP BY
     CAST(
         synthetic_order_timestamp AS DATE

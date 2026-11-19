@@ -47,12 +47,12 @@ def build_filtered_items_cte(filters):
                 o.synthetic_order_timestamp AS TIMESTAMP
             ) AS order_timestamp
 
-        FROM instacart_db.order_items oi
+        FROM instacart_db.order_items_safe oi
 
         JOIN instacart_db.products p
             ON oi.product_id = p.product_id
 
-        JOIN instacart_db.orders o
+        JOIN instacart_db.orders_safe o
             ON oi.order_id = o.order_id
 
         {where_clause}

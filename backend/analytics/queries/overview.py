@@ -57,7 +57,7 @@ def build_overview_query(filters):
             oi.order_id,
             oi.reordered,
             p.unit_price
-        FROM instacart_db.order_items oi
+        FROM instacart_db.order_items_safe oi
         JOIN instacart_db.products p
             ON oi.product_id = p.product_id
         {item_where}
@@ -67,7 +67,7 @@ def build_overview_query(filters):
         SELECT
             o.order_id,
             o.user_id
-        FROM instacart_db.orders o
+        FROM instacart_db.orders_safe o
         {order_where}
     ),
 
