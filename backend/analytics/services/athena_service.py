@@ -20,7 +20,7 @@ athena = boto3.client(
 
 QUERY_TIMEOUT = 25
 POLL_INTERVAL = 0.5
-MAX_RESULT_ROWS = 1000
+MAX_RESULT_ROWS = 3000
 
 
 def run_query(sql, max_rows=MAX_RESULT_ROWS):
@@ -96,7 +96,10 @@ def run_query(sql, max_rows=MAX_RESULT_ROWS):
     while len(rows) < max_rows:
         params = {
             "QueryExecutionId": query_id,
-            "MaxResults": min(1000, max_rows + 1)
+            "MaxResults": min(
+                1000,
+                max_rows - len(rows) + (1 if first_page else 0)
+            )
         }
 
         if next_token:

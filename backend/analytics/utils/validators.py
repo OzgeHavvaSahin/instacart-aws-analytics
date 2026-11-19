@@ -61,6 +61,21 @@ def validate_products_filters(params):
     if sort_order not in {"asc", "desc"}:
         raise ValueError("Invalid sort_order")
 
+    date_from = parse_iso_date(
+        params.get("date_from"),
+        "date_from"
+    )
+
+    date_to = parse_iso_date(
+        params.get("date_to"),
+        "date_to"
+    )
+
+    if date_from and date_to and date_from > date_to:
+        raise ValueError(
+            "date_from cannot be after date_to"
+        )
+
     return {
         "department_id": parse_positive_int(
             params.get("department_id"),
@@ -74,6 +89,8 @@ def validate_products_filters(params):
             params.get("reordered"),
             "reordered"
         ),
+        "date_from": date_from,
+        "date_to": date_to,
         "sort_by": sort_by,
         "sort_order": sort_order,
         "limit": validate_limit(

@@ -6,23 +6,24 @@ FROM instacart_db.departments
 ORDER BY department
 """
 
-
 def build_aisles_filter_query(department_id=None):
     where_clause = ""
 
     if department_id is not None:
         where_clause = (
-            f"WHERE p.department_id = {department_id}"
+            f"WHERE p.department_id = {int(department_id)}"
         )
 
     return f"""
-    SELECT DISTINCT
+    SELECT
         a.aisle_id,
-        a.aisle
+        a.aisle,
+        MIN(p.department_id) AS department_id
     FROM instacart_db.aisles a
     JOIN instacart_db.products p
         ON a.aisle_id = p.aisle_id
     {where_clause}
+    GROUP BY a.aisle_id, a.aisle
     ORDER BY a.aisle
     """
 
