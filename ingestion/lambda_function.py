@@ -1,3 +1,4 @@
+
 import json
 import logging
 import re
@@ -5,12 +6,12 @@ import re
 from urllib.parse import unquote_plus
 
 from config import s3, BUCKET
-
 from processor import process_batch
 
 from monitoring import (
     try_save_system_event,
     try_send_error_notification,
+    try_send_success_notification,
 )
 
 from batch_state import (
@@ -53,10 +54,6 @@ def lambda_handler(event, context):
             None,
         )
 
-        # =====================================
-        # IDEMPOTENCY CHECK
-        # =====================================
-
         claim_status, attempt_id = claim_batch(
             batch_id
         )
@@ -76,7 +73,7 @@ def lambda_handler(event, context):
 
         if claim_status == "PROCESSING":
             logger.warning(
-                "BATCH ALREADY IN PROGRESS: %s",
+                "BATCH ALREADY PROCESSING: %s",
                 batch_id,
             )
 
@@ -88,14 +85,9 @@ def lambda_handler(event, context):
             continue
 
         logger.info(
-            "START BATCH: %s | attempt=%s",
+            "START BATCH: %s",
             batch_id,
-            attempt_id,
         )
-
-        # =====================================
-        # PROCESS BATCH
-        # =====================================
 
         try:
             response = s3.get_object(
@@ -113,9 +105,20 @@ def lambda_handler(event, context):
                 response["Body"].close()
 
             output = process_batch(
-                bucket,
-                batch_id,
-                manifest,
+                bucket=bucket,
+                batch_id=batch_id,
+                manifest=manifest,
+                attempt_id=attempt_id,
+            )
+
+            # Do not declare SUCCESS
+            # until the commit exists.
+
+            mark_batch_success(
+                batch_id=batch_id,
+                attempt_id=attempt_id,
+                order_count=manifest["order_count"],
+                item_count=manifest["item_count"],
             )
 
         except Exception as error:
@@ -131,11 +134,6 @@ def lambda_handler(event, context):
             )
 
             message = str(error)[:500]
-
-            # Mark FAILED before raising.
-            # Failure of this state update is
-            # logged without masking the
-            # original processing exception.
 
             try:
                 mark_batch_failed(
@@ -164,23 +162,8 @@ def lambda_handler(event, context):
 
             raise
 
-        # =====================================
-        # COMMIT BATCH STATE
-        # =====================================
-
-        # This operation must succeed.
-        # If it fails, do NOT falsely report
-        # that the batch is complete.
-
-        mark_batch_success(
-            batch_id=batch_id,
-            attempt_id=attempt_id,
-            order_count=manifest["order_count"],
-            item_count=manifest["item_count"],
-        )
-
-        # Monitoring is secondary to the
-        # authoritative batch-state record.
+        # Both files and the commit are ready.
+        # DynamoDB batch state is SUCCESS.
 
         try_save_system_event(
             status="SUCCESS",
@@ -188,6 +171,12 @@ def lambda_handler(event, context):
             order_count=manifest["order_count"],
             item_count=manifest["item_count"],
             request_id=request_id,
+        )
+
+        try_send_success_notification(
+            batch_id=batch_id,
+            order_count=manifest["order_count"],
+            item_count=manifest["item_count"],
         )
 
         results.append({

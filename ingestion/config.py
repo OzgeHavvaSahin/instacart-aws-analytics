@@ -27,3 +27,7 @@ dynamodb = boto3.resource("dynamodb")
 events_table = dynamodb.Table(
     EVENTS_TABLE_NAME
 )
+
+STAGING_PREFIX = "staging/"
+PROCESSED_V2_PREFIX = "processed_v2/"
+COMMITS_PREFIX = "control/commits/"

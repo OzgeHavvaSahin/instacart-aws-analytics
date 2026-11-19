@@ -106,3 +106,48 @@ def try_send_error_notification(
         logger.exception(
             "Failed to publish SNS notification"
         )
+
+
+
+def send_success_notification(
+    batch_id,
+    order_count,
+    item_count,
+):
+    if not ALERTS_TOPIC_ARN:
+        raise RuntimeError(
+            "ALERTS_TOPIC_ARN is not configured"
+        )
+
+    sns.publish(
+        TopicArn=ALERTS_TOPIC_ARN,
+        Subject="Instacart Ingestion - SUCCESS",
+        Message=(
+            "Instacart Batch Successfully Loaded\n\n"
+            f"Batch: {batch_id}\n"
+            "Status: SUCCESS\n"
+            f"Orders: {order_count:,}\n"
+            f"Items: {item_count:,}\n\n"
+            "Both Parquet files were verified.\n"
+            "Batch commit was created.\n"
+            "DynamoDB state: SUCCESS\n"
+        ),
+    )
+
+
+def try_send_success_notification(
+    batch_id,
+    order_count,
+    item_count,
+):
+    try:
+        send_success_notification(
+            batch_id,
+            order_count,
+            item_count,
+        )
+    except Exception:
+        logger.exception(
+            "SUCCESS email failed: %s",
+            batch_id,
+        )
