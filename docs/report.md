@@ -37,23 +37,7 @@ Kaynak olarak **Instacart Market Basket Analysis** veri seti kullanılmıştır.
 
 ## 4. Sistem Mimarisi
 
-```mermaid
-flowchart TD
-    A[Instacart CSV + sentetik referans verileri] --> B[Amazon S3 - raw / batches]
-    B -->|_READY.json olayı| C[AWS Lambda - Ingestion]
-    C <--> D[(DynamoDB - Batch State)]
-    C --> E[S3 - Staging]
-    E --> F[S3 - processed_v2 / Parquet]
-    F --> G[S3 - control / commits]
-    F --> H[Glue Data Catalog + Athena]
-    G --> H
-    H --> I[orders_safe / order_items_safe]
-    I --> J[Analytics Lambda - Function URL]
-    J --> K[React + TypeScript Dashboard]
-    C --> L[CloudWatch + DynamoDB Events]
-    C --> M[Amazon SNS - E-posta]
-    K -. barındırma .-> N[Amazon S3 Static Website Hosting]
-```
+![](./mermaid-diagram.png)
 
 ### 4.1. Veri akışı
 
@@ -75,13 +59,86 @@ flowchart TD
 | API dağıtımı | Docker, Amazon ECR, AWS CodeBuild, Lambda Function URL |
 | Web arayüzü | React, TypeScript, Vite, S3 Static Website Hosting |
 
-> **Tasarım notu:** Commit manifesti ve safe view yaklaşımı, eksik batch'lerin analitik sorgularda görünmesini önlemeyi hedefler. Bu mekanizma tam bir çok-tablolu ACID transaction değildir.
-
 ---
 
-## Sonraki bölümler (plan)
+## 5. S3 Data Lake ve Batch Yapısı
 
-5. **S3 Data Lake ve Batch Yapısı**  
+### 5.1. S3 Veri Gölü Organizasyonu
+
+Projede Amazon S3, ham verilerin ve işlenmiş analitik verilerin saklandığı merkezi veri gölü (Data Lake) olarak kullanılmaktadır.
+
+Veriler, işleme aşamalarına göre farklı dizinlerde tutulmaktadır. Böylece kaynak dosyalar korunurken işlenmiş veriler ve batch kontrol kayıtları birbirinden ayrılmaktadır.
+
+```text
+instacart-ecom-data-raw/
+│
+├── raw/
+│   ├── reference/              # Referans veriler
+│   └── batches/                # CSV batch dosyaları
+│       └── batch_0015/
+│           ├── orders.csv
+│           ├── order_items.csv
+│           └── _READY.json
+│
+├── processed/                   # İlk 14 batch (eski yapı)
+│   ├── orders/
+│   └── order_items/
+│
+├── staging/                     # Geçici Parquet çıktıları
+│
+├── processed_v2/                # Yeni Parquet yapısı
+│   ├── orders/
+│   │   └── batch_0015.parquet
+│   └── order_items/
+│       └── batch_0015.parquet
+│
+└── control/
+    └── commits/
+        └── batch_0015.json
+```
+
+### 5.2. Batch Tabanlı Veri Yükleme
+
+Veri seti, günlük veri akışını simüle etmek amacıyla batch dosyalarına ayrılmıştır.
+
+Her batch iki CSV dosyası ve bir kontrol dosyası içerir:
+
+| Dosya | Görevi |
+|---|---|
+| `orders.csv` | Sipariş ve müşteri bilgileri |
+| `order_items.csv` | Siparişlerdeki ürün bilgileri |
+| `_READY.json` | Batch doğrulama bilgilerini ve işleme sinyalini içerir |
+
+Normal yükleme sürecinde önce CSV dosyaları, ardından `_READY.json` yüklenir.
+
+S3 üzerinde `_READY.json` oluşturulduğunda AWS Lambda otomatik olarak tetiklenir.
+
+### 5.3. Veri Bütünlüğü ve Commit Mekanizması
+
+İlk tasarımda Lambda, Parquet dosyalarını doğrudan `processed/` dizinine yazmaktaydı. Bu yaklaşımda dosyalardan biri başarıyla yazılırken diğerinin başarısız olması, eksik batch verilerinin analitik sorgulara yansıması riskini oluşturuyordu.
+
+Bu nedenle sistem, **staging ve commit tabanlı yeni bir yapıya** geçirilmiştir.
+
+```mermaid
+flowchart TD
+    A["S3: _READY.json"] --> B["Lambda: Veri doğrulama"]
+    B --> C["CSV → Parquet"]
+    C --> D["S3: staging/"]
+    D --> E["S3: processed_v2/"]
+    E --> F{"İki dosya doğrulandı mı?"}
+    F -->|Evet| G["COMMITTED manifest"]
+    F -->|Hayır| H["Hata kaydı"]
+    G --> I["Athena Safe Views"]
+```
+
+İki Parquet dosyası başarıyla oluşturulup doğrulandıktan sonra `control/commits/` altında bir JSON manifesti yazılır.
+
+Athena üzerindeki `orders_safe` ve `order_items_safe` görünümleri, yeni mimaride yalnızca `COMMITTED` durumundaki batch'leri sorgular. İlk 14 batch ise eski tablolardan okunmaya devam eder.
+
+Bu mekanizma, eksik batch'lerin analitik sonuçlarda görünmesini önlemeyi amaçlar. Ancak tam ACID transaction garantisi sağlamaz.
+
+
+
 6. **Ingestion Pipeline ve Veri Doğrulama**  
 7. **Idempotency, Commit Mekanizması ve Hata Yönetimi**  
 8. **Athena Analitiği ve API Endpoint'leri**  
